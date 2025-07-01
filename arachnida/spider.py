@@ -1,6 +1,10 @@
 import sys
 import re
 import os
+import urllib.request
+from urllib.parse import urlparse
+from html.parser import HTMLParser
+import webbrowser
 
 FLAGS = "rlp"
 
@@ -78,13 +82,64 @@ def print_settings():
     print("Path: ", arg_path)
     print("URL: ", arg_url)
 
+# def get_href(tuple):
+#     [item for item in a if item[0] == 1]
 
-# Parse and validate arguments
-try:
+class MyHtmlParser(HTMLParser):
+
+    def __init__(self):
+        super().__init__()
+        self.url = None
+
+    def handle_starttag(self, tag, attrs): # for <a href="" ></a>
+        match tag:
+            case "a":
+                # print("Encountered a link: ", tag)
+                attr_dict = dict(attrs)
+                link = attr_dict['href']
+                if link != None and link.find(url.netloc) == -1:
+                    print(link)
+                # if link != None and link.find(url.netloc) == len(url.netloc):
+                #     print(link)
+
+                # print(attr_dict['href'])
+                # print(attrs)
+                # for attr in attrs:
+                    # if attr.find(url.netloc):
+                    #     print(attr)
+                # if attrs.find(url.netloc):
+                    # print("Attributes: ", attrs)
+            # case "img":
+            #     print("Encountered an image: ", tag)
+            #     print("Attributes: ", attrs)
+
+    # def handle_startendtag(self, tag, attrs): # for <img src=""/>
+    #     match tag:
+    #         case "img":
+    #             print("Encountered an image: ", tag)
+    #             print("Attributes: ", attrs)
+
+try: # PARSING & VALIDATING INPUT
     parse_arguments()
     validate_arguments(arg_path, arg_url)
+    url = urlparse(arg_url)
+    print(url)
     print_settings()
+
+    # PARSING HTML IMG
+    fp = urllib.request.urlopen(arg_url)
+    mybytes = fp.read()
+    mystr = mybytes.decode("utf8")
+    fp.close()
+    parser = MyHtmlParser()
+    parser.url = url
+    parser.feed(mystr)
+    
+
+
 except Exception as e:
     print("Error: ", e)
+
+
 
 
