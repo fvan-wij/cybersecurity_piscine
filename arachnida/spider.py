@@ -2,8 +2,9 @@ import sys
 import re
 import os
 import urllib.request
+import urllib.request
 from urllib.parse import urlparse
-import requests;
+from urllib.error import HTTPError, URLError
 from html.parser import HTMLParser
 import webbrowser
 
@@ -101,6 +102,7 @@ def is_valid_extension(extension):
         case _:
             return False
 
+
 class MyHtmlParser(HTMLParser):
 
     def __init__(self):
@@ -120,7 +122,6 @@ class MyHtmlParser(HTMLParser):
             case "img":
                 pair = os.path.splitext(attrs[0][1])
                 if is_valid_extension(pair[1]):
-                    # print(f"{self.netloc}/{attrs[0][1]}")
                     self.images.add(f"{attrs[0][1]}")
 
     def get_images(self):
@@ -129,12 +130,12 @@ class MyHtmlParser(HTMLParser):
     def get_links(self):
         return self.links
 
-    # def handle_startendtag(self, tag, attrs): # for <element/>
-    #     match tag:
-    #         case "img":
-    #             print("Encountered an image: ", tag)
-    #             print("Attributes: ", attrs)
-    #
+    def handle_startendtag(self, tag, attrs): # for <element/>
+        if tag == "img":
+            pair = os.path.splitext(attrs[0][1])
+            if is_valid_extension(pair[1]):
+                self.images.add(f"{attrs[0][1]}")
+
 
 def read_and_feed_parser(parser, url):
     fp = urllib.request.urlopen(url) # Opens URL and sends request
@@ -147,13 +148,21 @@ def init_html_parser(netloc):
     parser = MyHtmlParser()
     return parser
 
+def clean_up_url(url):
+    while url.find("../") != -1:
+        url = url.replace("../", "")
+        print("cleaning..", url)
+    return url
+
+
 def get_images_till_depth_lvl(depth, base_url, path):
+    global opt_recursion
     url = f"{base_url}/{path}"
+    url = clean_up_url(url)
     if depth <= 0: 
+        print("arachnida finished!")
         return
-
-    print(f"Getting images for lvl {depth} on page: {base_url}/{path}")
-
+    print(f"Level [{depth} | {url}]: ")
     parsed_url = urlparse(url)
     parser = MyHtmlParser()
     parser.netloc = parsed_url.netloc
@@ -165,16 +174,23 @@ def get_images_till_depth_lvl(depth, base_url, path):
     parser.feed(mystr)
     images = parser.get_images()
     links = parser.get_links()
-    # with open("demofile.txt", "a") as f:
-        # f.write(f"LEVEL: {depth} | LINK: {base_url}{path}\n")
     for img in images:
-
-        # print(f"Image: {img}")
-        # f.write(f"{img}\n")
-        # f.close()
-    for link in links:
-        # print(f"Link: {link}")
-        get_images_till_depth_lvl(depth - 1, base_url, link)
+        img_url = f"{base_url}/{img}"
+        img_name = os.path.basename(urlparse(img_url).path)
+        try:
+            img_url = clean_up_url(img_url)
+            urllib.request.urlretrieve(img_url, f"./data/{img_name}")
+            print(".", end='')
+        except HTTPError as e:
+            print(f"\nHTTP Error ({e.code}) for {img_url}: {e.reason}")
+        except URLError as e:
+            print(f"\nURL Error for {img_url}: {e.reason}")
+        except Exception as e:
+            print(f"\nUnexpected error for {img_url}: {e}")
+    print("")
+    if opt_recursion:
+        for link in links:
+            get_images_till_depth_lvl(depth - 1, base_url, link)
 
 
 try: # PARSING & VALIDATING INPUT
